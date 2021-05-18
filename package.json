@@ -1,0 +1,26 @@
+{
+  "name": "semantic-website",
+  "version": "0.0.1",
+  "description": "A website built from an RDF store",
+  "main": "index.js",
+  "scripts": {
+    "run": "node index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/BruJu/Semantic-Website.git"
+  },
+  "author": "",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/BruJu/Semantic-Website/issues"
+  },
+  "homepage": "https://github.com/BruJu/Semantic-Website#readme",
+  "dependencies": {
+    "@rdfjs/namespace": "^1.1.0",
+    "express": "^4.17.1",
+    "mustache": "^4.2.0",
+    "n3": "^1.10.0"
+  }
+}
