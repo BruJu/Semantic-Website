@@ -1,0 +1,15 @@
+<div class="content">
+  <h2>{{resources.name}}</h2>
+
+  <p>
+    {{#resources.description}}
+      {{.}}
+    {{/resources.description}}
+    {{^resources.description}}
+    <em>
+      Not much is known about {{resources.name}}, but the
+      chances it is a very nice person are very high.
+    </em>
+    {{/resources.description}}   
+  </p>
+</div>

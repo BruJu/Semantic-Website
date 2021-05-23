@@ -1,0 +1,16 @@
+<div class="content">
+  <table>
+    <tr>
+      <th>Subject</th>
+      <th>Predicate</th>
+      <th>Object</th>
+    </tr>
+    {{#quads}}
+      <tr>
+        {{#.}}
+          <td>{{{left}}}{{value}}{{{right}}}</td>
+        {{/.}}
+      </tr>
+    {{/quads}}
+  </table>
+</div>

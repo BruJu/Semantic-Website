@@ -1,7 +1,11 @@
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
 
 <mathilde> rdf:type <Person> ;
-    <name> "Mathilde" .
+    <name> "Mathilde" ;
+    <description> "Mathilde is a cool girl." .
 
 <roger>    rdf:type <Person> ;
     <name> "Roger" .
+
+
+<Person> <useTemplate> "person" .

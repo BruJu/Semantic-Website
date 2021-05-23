@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html>
+  {{#title}}
+    <title>{{.}}</title>
+  {{/title}}
+  <head>
+    <style type="text/css">
+      body {
+        background-color: lightgrey;
+      }
+
+      .content {
+        background-color: white;
+      }
+    </style>
+  </head>
+  <body>
+    {{{content}}}
+  </body>
+</html>

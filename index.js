@@ -2,9 +2,18 @@ const N3 = require("n3");
 const fs = require("fs");
 const mustache = require("mustache");
 const express = require('express');
+const { defaultGraph } = N3.DataFactory;
+const namespace = require('@rdfjs/namespace');
+const rdf = namespace("http://www.w3.org/1999/02/22-rdf-syntax-ns#", N3.DataFactory);
+const RdfClass = require('./RDFGraphTraversal.js');
 
-const baseIRI = "http://semsite.bruy.at/"
-const port = 'passenger';
+const [baseIRI, port] = (() => {
+    if (typeof(PhusionPassenger) !== 'undefined') {
+        return ["http://semsite.bruy.at/", 'passenger'];
+    } else {
+        return ["http://localhost:3000/", '3000'];
+    }
+})();
 
 function getSuffix(iri) {
     return iri.substr(baseIRI.length);
@@ -16,7 +25,7 @@ function produceTheStore()  {
     const parser = new N3.Parser({ baseIRI })
     store.addQuads(parser.parse(fileContent));
     
-    console.error("The store has " + store.size + "quads.");
+    console.error("The store has " + store.size + " quads.");
     return store;
 }
 
@@ -47,6 +56,13 @@ function findEveryQuadsWith(store, iri) {
 }
 
 const store = produceTheStore();
+const prefixes = {
+    'rdf': "http://www.w3.org/1999/02/22-rdf-syntax-ns#",
+};
+
+const objects = RdfClass(baseIRI, prefixes, store);
+
+
 const managedIris = getManagedIris(store);
 
 
@@ -54,7 +70,7 @@ const managedIris = getManagedIris(store);
 const app = express();
 
 app.listen(port, () => {
-    console.log(`=== Server started: ${baseIRI}`)
+    console.log(`=== Server started: ${baseIRI}`);
 });
 
 
@@ -85,22 +101,90 @@ function adaptQuads(quads) {
 }
 
 
-let template = fs.readFileSync("template_triples.html", "utf-8");
+
+function loadTemplates(directory) {
+    const paths = fs.readdirSync(directory);
+
+    let templates = {};
+
+    for (const path of paths) {
+        if (!path.endsWith(".html")) continue;
+
+        const fullPath = directory + path;
+        const templateName = path.substr(0, path.length - ".html".length);
+        templates[templateName] = fs.readFileSync(fullPath, "utf-8");
+    }
+
+    if (templates.general === undefined || templates.triples === undefined) {
+        throw Error("Didn't found either general or triples");
+    }
+
+    return templates;
+}
+
+function makeBasicRenderForQuads(quads) {
+    const quadsTable = mustache.render(templates.triples, { "quads": adaptQuads(quads) });
+    const content = mustache.render(templates.general,
+        {
+            content: quadsTable
+        }
+    );
+    return content;
+}
+
+const templates = loadTemplates("templates/");
+
+
+function setUpRoutes() {
 
 
 {
-    let quads = store.getQuads();
-    const content = mustache.render(template, { "quads": adaptQuads(quads) });
+    const content = makeBasicRenderForQuads(store.getQuads());
     app.get("/", function(req, res) {
         res.send(content);
     })
 }
 
+function findTemplate(types) {
+    for (const type of types) {
+        let template = store.getQuads(type.object, N3.DataFactory.namedNode(baseIRI + "useTemplate"));
+        if (template.length !== 0)
+            return template[0].object.value;
+    }
+    
+    return undefined;
+}
+
 
 managedIris.forEach(managedIri => {
-    const quads = findEveryQuadsWith(store, N3.DataFactory.namedNode(baseIRI + managedIri));
-    const content = mustache.render(template, { "quads": adaptQuads(quads) });
+    const theIRI = N3.DataFactory.namedNode(baseIRI + managedIri);
+    const types = store.getQuads(theIRI, rdf.type, null, defaultGraph());
+    const template = findTemplate(types);
+    const quads = findEveryQuadsWith(store, theIRI);
+
+    let render;
+    if (template !== undefined) {
+        let quadsTable = mustache.render(templates[template], {
+            "quads": adaptQuads(quads),
+            "resources": objects[managedIri]
+        });
+        quadsTable += mustache.render(templates.triples, { "quads": adaptQuads(quads) });
+        render = mustache.render(templates.general,
+            {
+                content: quadsTable
+            }
+        );
+
+    } else {
+        render = makeBasicRenderForQuads(quads);
+    }
+
+
     app.get("/" + managedIri, function(req, res) {
-        res.send(content);
+        res.send(render);
     });
 });
+
+}
+
+setUpRoutes();
