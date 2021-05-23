@@ -3,126 +3,91 @@
 
 
 /**
- * 
+ * Return the short IRI if it exists
  * @param {String} iri 
- * @param {*} base 
- * @param {*} prefixes 
- * @returns 
+ * @param {*} prefixes The list of prefixes
+ * @returns A list of valid short IRIs
  */
-function readIRI(iri, base, prefixes) {
-    let coma = iri.indexOf(":");
-    let dash = iri.indexOf("/");
-    if (dash !== -1 && coma > dash) {
-        coma = -1;
-    }
-    if (iri.startsWith("http:") || iri.startsWith("https:")) {
-        coma = -1;
-    }
-
-    if (coma === -1) {
-        if (iri.startsWith(base)) {
-            let short = ":" + iri.substr(base.length);
-            return [short, iri];
-        }
-
-        for (const [prefix, prefixIrl] of Object.entries(prefixes)) {
-            if (iri.startsWith(prefixIrl)) {
-                const short = prefix + ":" + iri.substring(prefixIrl.length);
-                return [short, iri];
-            }
-        }
-
-        return null;
-    } else {
-        let prefix = iri.substr(0, coma);
-        let suffix = iri.substr(coma + 1);
-
-        let prefixIRI = prefix === "" ? base : prefixes[prefix];
-        if (prefixIRI === undefined) return null;
-
-        return [iri, prefixIRI + suffix];
-    }
+function findShortIRIs(iri, prefixes) {
+    return Object.entries(prefixes)
+        .filter(prefix => iri.startsWith(prefix[1]))
+        .map(prefix => prefix[0] + ":" + iri.substring(prefix[1].length));
 }
 
-class RdfObject {
-    constructor(iris) {
-        this.shortIRI = iris[0];
-        this.longIRI = iris[1];
-        this.isRDFObject = true;
-    }
-
-    at(a) {
-        return this[a];
-    }
-}
-
-class RdfObjects {
-    constructor(baseIRI, prefixes) {
-        this.baseIRI = baseIRI;
-        this.prefixes = prefixes;
-    }
-
+/** Wrapper for an RDF/JS term to register its path */
+class RDFElement {
     /**
-     * 
-     * @param {String} iri 
+     * Builds an RDFElement with no path
+     * @param {*} term The RDF/JS term
+     * @param {string[]} shortIRIs Known short IRIs for the node
      */
-    getFromIRI(iri) {
-        let z = readIRI(iri, this.baseIRI, this.prefixes);
-        if (z === null) {
-            return undefined;
+    constructor(term, shortIRIs) {
+        this.term = term;
+        this.termType = term.termType;
+        this.longIRI = term.termType === 'NamedNode' ? term.value : undefined;
+        this.shortIRIs = shortIRIs;
+        this.relativeIRI = undefined;
+        
+        this.iris = [...shortIRIs];
+        if (this.longIRI !== undefined) this.iris.push(this.longIRI);
+
+        if (term.termType === 'Literal') {
+            this.toString = () => this.term.value;
         }
 
-        if (this[z[0]] === undefined) {
-            this[z[0]] = new RdfObject(z);
-        }
-
-        return this[z[0]];
-    }
-
-    getFromTerm(term) {
         if (term.termType === 'NamedNode') {
-            let x = this.getFromIRI(term.value, this.baseIRI, this.prefixes);
-            if (x === undefined) {
-                return term;
-            } else {
-                return x;
+            let t = this.iris.find(iri => iri.startsWith(":"));
+            if (t !== undefined) {
+                this.relativeIRI = t.substring(1);
             }
-        } else if (term.termType === 'Literal') {
-            return term.value;
+        }
+    }
+}
+
+class RDFTraversal {
+    constructor(store, prefixes) {
+        this.prefixes = prefixes;
+        this.elements = [];
+        this.store = store;
+
+        for (const quad of store.getQuads()) {
+            this._addTriple(quad.subject, quad.predicate, quad.object);
+        }
+    }
+
+    _addTriple(subject, predicate, object) {
+        const s = this._getFromTerm(subject);
+        const p = this._getFromTerm(predicate);
+        const o = this._getFromTerm(object);
+
+        if (p.iris.length === 0) {
+            throw Error("A node doesn't have a named node as a predicate");
+        }
+
+        for (const path of p.iris) {
+            s[path] = o;
+        }
+    }
+    
+    _getFromTerm(term) {
+        if (term.termType === 'NamedNode') {
+            const shortIRIs = findShortIRIs(term.value, this.prefixes);
+
+            let rdfElement = this[term.value];
+            if (rdfElement === undefined) {
+                let e = new RDFElement(term, shortIRIs);
+
+                for (const iri of e.iris) {
+                    this[iri] = e;
+                }
+
+                this.elements.push(e);
+            }
+            return this[term.value];
         } else {
-            throw Error(term.termType + " are not yet supported");
+            return new RDFElement(term, []);
         }
     }
 }
 
-function ToObjects(baseIRI, prefixes, store) {
-    let result = new RdfObjects(baseIRI, prefixes);
-
-    for (const quad of store.getQuads()) {
-        let subject   = result.getFromTerm(quad.subject);
-        let predicate = result.getFromTerm(quad.predicate);
-        let object    = result.getFromTerm(quad.object);
-
-        if (subject.isRDFObject === true) {
-            let field;
-            if (predicate.isRDFObject) {
-                field = predicate.shortIRI;
-            } else {
-                field = predicate.value;
-            }
-
-            if (subject[field] === undefined) {
-                subject[field] = object;
-            } else if (Array.isArray(subject[field])) {
-                subject[field].push(object)
-            } else {
-                subject[field] = [subject[field], object];
-            }
-        }
-    }
-
-    return result;
-}
-
-
-module.exports = ToObjects;
+module.exports = RDFTraversal;

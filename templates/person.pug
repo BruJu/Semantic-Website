@@ -1,10 +1,10 @@
 div(class='content')
-  h2 #{resources[':name']}
+  h2 #{resource[':name']}
 
   p
-    if resources[':description']
-      | #{resources[':description']}
+    if resource[':description']
+      | #{resource[':description']}
     else
       em
-        | Not much is known about #{resources[':name']}, but the chances it is a
+        | Not much is known about #{resource[':name']}, but the chances it is a
         | very nice person are very high.

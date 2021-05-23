@@ -9,5 +9,9 @@ div(class='content')
     
     each quad in quads
       tr
-        each component in quad
-          td !{component.left}#{component.value}!{component.right}
+        each component in ["subject", "predicate", "object"]
+          if quad[component].iri
+            td 
+              a(href=`${quad[component].iri}`) #{quad[component].iri}
+          else
+            td #{quad[component].value}
