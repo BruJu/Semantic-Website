@@ -1,0 +1,17 @@
+div(class='content')
+  h2 #{sectionName}
+
+  table
+    tr
+      th Subject
+      th Predicate
+      th Object
+    
+    each quad in quads
+      tr
+        each component in ["subject", "predicate", "object"]
+          if quad[component].iri
+            td 
+              a(href=`${quad[component].iri}`) #{quad[component].iri}
+          else
+            td #{quad[component].value}
