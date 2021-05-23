@@ -21,7 +21,7 @@ function readIRI(iri, base, prefixes) {
 
     if (coma === -1) {
         if (iri.startsWith(base)) {
-            let short = iri.substr(base.length);
+            let short = ":" + iri.substr(base.length);
             return [short, iri];
         }
 

@@ -1,11 +1,12 @@
 const N3 = require("n3");
 const fs = require("fs");
-const mustache = require("mustache");
 const express = require('express');
 const { defaultGraph } = N3.DataFactory;
 const namespace = require('@rdfjs/namespace');
 const rdf = namespace("http://www.w3.org/1999/02/22-rdf-syntax-ns#", N3.DataFactory);
 const RdfClass = require('./RDFGraphTraversal.js');
+const pug = require('pug');
+const prettify = require('pretty');
 
 const [baseIRI, port] = (() => {
     if (typeof(PhusionPassenger) !== 'undefined') {
@@ -25,7 +26,7 @@ function produceTheStore()  {
     const parser = new N3.Parser({ baseIRI })
     store.addQuads(parser.parse(fileContent));
     
-    console.error("The store has " + store.size + " quads.");
+    console.log("The store has " + store.size + " quads.");
     return store;
 }
 
@@ -108,11 +109,11 @@ function loadTemplates(directory) {
     let templates = {};
 
     for (const path of paths) {
-        if (!path.endsWith(".html")) continue;
+        if (!path.endsWith(".pug")) continue;
 
         const fullPath = directory + path;
-        const templateName = path.substr(0, path.length - ".html".length);
-        templates[templateName] = fs.readFileSync(fullPath, "utf-8");
+        const templateName = path.substr(0, path.length - ".pug".length);
+        templates[templateName] = pug.compileFile(fullPath);
     }
 
     if (templates.general === undefined || templates.triples === undefined) {
@@ -123,8 +124,11 @@ function loadTemplates(directory) {
 }
 
 function makeBasicRenderForQuads(quads) {
-    const quadsTable = mustache.render(templates.triples, { "quads": adaptQuads(quads) });
-    const content = mustache.render(templates.general,
+    const quadsTable = templates.triples({
+        "sectionName": "Related triples",
+        "quads": adaptQuads(quads)
+    });
+    const content = templates.general(
         {
             content: quadsTable
         }
@@ -136,54 +140,59 @@ const templates = loadTemplates("templates/");
 
 
 function setUpRoutes() {
-
-
-{
-    const content = makeBasicRenderForQuads(store.getQuads());
-    app.get("/", function(req, res) {
-        res.send(content);
-    })
-}
-
-function findTemplate(types) {
-    for (const type of types) {
-        let template = store.getQuads(type.object, N3.DataFactory.namedNode(baseIRI + "useTemplate"));
-        if (template.length !== 0)
-            return template[0].object.value;
+    {
+        const content = prettify(makeBasicRenderForQuads(store.getQuads()));
+        app.get("/", function(req, res) {
+            res.send(content);
+        })
     }
-    
-    return undefined;
-}
+
+    function findTemplate(types) {
+        for (const type of types) {
+            let template = store.getQuads(type.object, N3.DataFactory.namedNode(baseIRI + "useTemplate"));
+            if (template.length !== 0)
+                return template[0].object.value;
+        }
+        
+        return undefined;
+    }
 
 
-managedIris.forEach(managedIri => {
-    const theIRI = N3.DataFactory.namedNode(baseIRI + managedIri);
-    const types = store.getQuads(theIRI, rdf.type, null, defaultGraph());
-    const template = findTemplate(types);
-    const quads = findEveryQuadsWith(store, theIRI);
+    managedIris.forEach(managedIri => {
+        const theIRI = N3.DataFactory.namedNode(baseIRI + managedIri);
+        const types = store.getQuads(theIRI, rdf.type, null, defaultGraph());
+        const template = findTemplate(types);
+        const quads = findEveryQuadsWith(store, theIRI);
 
-    let render;
-    if (template !== undefined) {
-        let quadsTable = mustache.render(templates[template], {
-            "quads": adaptQuads(quads),
-            "resources": objects[managedIri]
+        let render;
+        if (template !== undefined) {
+            let quadsTable = templates[template](
+                {
+                    "quads": adaptQuads(quads),
+                    "resources": objects[":" + managedIri]
+                }
+            );
+
+            quadsTable += templates.triples({ 
+                sectionName: "Related triples",
+                "quads": adaptQuads(quads) });
+            render = templates.general(
+                {
+                    content: quadsTable
+                }
+            );
+
+        } else {
+            render = makeBasicRenderForQuads(quads);
+        }
+
+        render = prettify(render);
+
+
+        app.get("/" + managedIri, function(req, res) {
+            res.send(render);
         });
-        quadsTable += mustache.render(templates.triples, { "quads": adaptQuads(quads) });
-        render = mustache.render(templates.general,
-            {
-                content: quadsTable
-            }
-        );
-
-    } else {
-        render = makeBasicRenderForQuads(quads);
-    }
-
-
-    app.get("/" + managedIri, function(req, res) {
-        res.send(render);
     });
-});
 
 }
 

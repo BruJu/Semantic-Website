@@ -9,3 +9,10 @@
 
 
 <Person> <useTemplate> "person" .
+
+
+<a> <z> <c> .
+<c> <z> <f> .
+<f> <z> <a> .
+<a> <name> "The letter A" .
+<a> rdf:type <Person> .
