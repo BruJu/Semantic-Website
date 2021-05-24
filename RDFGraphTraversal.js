@@ -27,6 +27,7 @@ class RDFElement {
         this.longIRI = term.termType === 'NamedNode' ? term.value : undefined;
         this.shortIRIs = shortIRIs;
         this.relativeIRI = undefined;
+        this.doubles = [];
         
         this.iris = [...shortIRIs];
         if (this.longIRI !== undefined) this.iris.push(this.longIRI);
@@ -40,6 +41,22 @@ class RDFElement {
             if (t !== undefined) {
                 this.relativeIRI = t.substring(1);
             }
+        }
+    }
+
+    shortestRepresentation() {
+        if (this.iris.length !== 0) {
+            return this.iris.reduce((best, candidate) => {
+                if (best === undefined || best.length > candidate.length) {
+                    return candidate;
+                } else {
+                    return best;
+                }
+            } , undefined);
+        } else if (this.term.termType === "Literal") {
+            return "''" + this.term.value + "''";
+        } else {
+            return "{ " + this.term.value + "}";
         }
     }
 }
@@ -67,6 +84,8 @@ class RDFTraversal {
         for (const path of p.iris) {
             s[path] = o;
         }
+
+        s.doubles.push([p, o]);
     }
     
     _getFromTerm(term) {
@@ -87,6 +106,22 @@ class RDFTraversal {
         } else {
             return new RDFElement(term, []);
         }
+    }
+
+    toDot() {
+        let document = [];
+
+        for (const element of this.elements) {
+            for (const [p, o] of element.doubles) {
+                document.push(`"${element.shortestRepresentation()}" -> "${o.shortestRepresentation()}" [label="${p.shortestRepresentation()}"]`);
+                if (o.term.termType === 'Literal') {
+                    document.push(`"${o.shortestRepresentation()}" [shape="none"]`);
+                }
+            }
+
+        }
+
+        return "digraph {\n" + document.join("\n") + "\n}";
     }
 }
 

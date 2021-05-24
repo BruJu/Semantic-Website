@@ -103,8 +103,6 @@ const Render = {
 const traversal = Database.produceTheTraversal();
 const managedIris = Database.getManagedIris(traversal);
 
-
-
 const app = express();
 
 app.listen(port, () => {
@@ -118,7 +116,7 @@ function setUpRoutes() {
         const mainContent = templates.triples({
             sectionName: "Known triples",
             quads: Render.adaptQuads(traversal.store.getQuads())
-        });
+        }) + templates.index({ content: traversal.toDot() });
 
         const content = Render.finishPage(templates, mainContent);
         app.get("/", (_req, res) => res.send(content));

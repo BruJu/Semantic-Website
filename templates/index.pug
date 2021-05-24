@@ -1,0 +1,8 @@
+div(class='content')
+  h2 Data contained
+  div(id='graph')
+  
+  script(src="//d3js.org/d3.v4.min.js")
+  script(src="//viz-js.com/bower_components/viz.js/viz-lite.js")
+  script(src="//github.com/magjac/d3-graphviz/releases/download/v0.0.4/d3-graphviz.min.js")
+  script d3.select('#graph').graphviz().renderDot(`!{content}`);
